@@ -1,4 +1,6 @@
-const backendUrl = "http://localhost:8000/chat"; // 之後部署時改成你的後端 URL
+// 指向 n8n「Production URL」，不用按 listen 就能收；若要改回本機可設為 http://localhost:8000/chat
+//const backendUrl = "https://a38ea8040ab2.ngrok-free.app/webhook/paiwan-chat";
+const backendUrl = "http://localhost:5678/webhook-test/paiwan-chat";
 
 const messagesEl = document.getElementById("messages");
 const inputEl = document.getElementById("user-input");

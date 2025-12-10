@@ -1,0 +1,49 @@
+{
+  "nodes": [
+    {
+      "id": "Webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "paiwan-chat",
+        "responseMode": "onReceived",
+        "options": {
+          "responseContentType": "json"
+        }
+      }
+    },
+    {
+      "id": "ChatAPI",
+      "name": "Chat API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [440, 300],
+      "parameters": {
+        "url": "http://localhost:8000/chat",
+        "method": "POST",
+        "responseFormat": "json",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "{\"message\": \"={{$json.message}}\"}"
+      }
+    },
+    {
+      "id": "Respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [680, 300],
+      "parameters": {
+        "responseMode": "lastNode",
+        "responseData": "allEntries"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [ [ { "node": "Chat API", "type": "main", "index": 0 } ] ] },
+    "Chat API": { "main": [ [ { "node": "Respond", "type": "main", "index": 0 } ] ] }
+  }
+}
