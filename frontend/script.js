@@ -7,6 +7,8 @@ const inputEl = document.getElementById("user-input");
 const sendBtn = document.getElementById("send-btn");
 const chips = document.querySelectorAll(".chip");
 
+let conversationHistory = [];
+
 function closeThinkingModal() {
   const existing = document.querySelector(".thinking-modal-overlay");
   if (existing) existing.remove();
@@ -92,6 +94,9 @@ async function sendMessage() {
   inputEl.value = "";
   inputEl.focus();
 
+  // Add user message to history
+  conversationHistory.push({ role: "user", content: text });
+
   const thinkingBubble = appendMessage({ text: "思考中...", type: "bot" });
 
   try {
@@ -100,16 +105,22 @@ async function sendMessage() {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ message: text }),
+      body: JSON.stringify({ messages: conversationHistory }),
     });
 
     if (!resp.ok) {
+      const errorText = await resp.text();
+      console.error("Server error:", errorText);
       thinkingBubble.textContent = `錯誤：${resp.status}`;
       return;
     }
 
     const data = await resp.json();
     const finalText = data.reply || "(空回覆)";
+
+    // Add assistant response to history
+    conversationHistory.push({ role: "assistant", content: finalText });
+
     const botMsg = appendMessage({
       text: finalText,
       type: "bot",

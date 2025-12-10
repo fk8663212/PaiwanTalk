@@ -1,18 +1,18 @@
 import json
 import re
-from typing import Optional
+from typing import Optional, List
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from openai import OpenAI
+from openai import AsyncOpenAI
 import os
 
 # ========= vLLM 設定 =========
 VLLM_BASE_URL = os.getenv("VLLM_BASE_URL", "http://210.61.209.139:45014/v1/")
 VLLM_API_KEY = os.getenv("VLLM_API_KEY", "dummy-key")  # 形式需要，但內容無所謂
 
-client = OpenAI(
+client = AsyncOpenAI(
     base_url=VLLM_BASE_URL,
     api_key=VLLM_API_KEY,
 )
@@ -26,9 +26,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+class Message(BaseModel):
+    role: str
+    content: str
+
 
 class ChatRequest(BaseModel):
-    message: str
+    messages: List[Message]
 
 
 class ChatResponse(BaseModel):
@@ -43,20 +47,20 @@ def root():
 
 
 @app.get("/models")
-def get_models():
+async def get_models():
     """
     回傳主辦方 vLLM 目前掛載的所有模型，方便你檢查真正的 model id。
     """
-    models = client.models.list()
+    models = await client.models.list()
     return models
 
 
-def get_default_model_name() -> str:
+async def get_default_model_name() -> str:
     """
     每次呼叫時都去 vLLM /models 拿第一個模型當預設。
     比賽環境不固定，用這招最保險。
     """
-    models = client.models.list()
+    models = await client.models.list()
     if not getattr(models, "data", None):
         raise RuntimeError("No models available from vLLM server.")
     return models.data[0].id
@@ -68,25 +72,91 @@ async def chat(req: ChatRequest):
     單純丟一段文字給 LLM，不做任何翻譯邏輯。
     自動從 /models 取得可用的 model id。
     """
-    model_name = get_default_model_name()
+    try:
+        model_name = await get_default_model_name()
+    except Exception as e:
+        return ChatResponse(reply="無法取得模型列表", model="unknown", thinking=str(e))
 
-    completion = client.chat.completions.create(
-        model=model_name,
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are a helpful assistant. Always respond with strict JSON "
-                    "using keys `reply` (final answer shown to the user) and "
-                    "`thinking` (brief reasoning). Do not include other text."
-                ),
-            },
-            {"role": "user", "content": req.message},
-        ],
-        temperature=0.7,
-    )
+    # 構建完整的對話歷史
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are a helpful assistant. Always respond with strict JSON "
+                "using keys `reply` (final answer shown to the user) and "
+                "`thinking` (brief reasoning). Do not include other text."
+            ),
+        }
+    ]
+    
+    # 加入前端傳來的歷史訊息
+    for msg in req.messages:
+        if msg.role == "assistant":
+            # 為了保持與 System Prompt 的一致性，將歷史紀錄中的 Assistant 回覆包裝回 JSON 格式
+            # 這樣模型才不會因為看到歷史紀錄是純文字而感到困惑，進而崩壞
+            try:
+                # 嘗試解析，如果已經是 JSON 就不重複包裝 (預防萬一)
+                json.loads(msg.content)
+                messages.append({"role": msg.role, "content": msg.content})
+            except json.JSONDecodeError:
+                # 如果是純文字，就包裝成 JSON
+                simulated_json = json.dumps({
+                    "reply": msg.content,
+                    "thinking": "Context from previous conversation"
+                }, ensure_ascii=False)
+                messages.append({"role": msg.role, "content": simulated_json})
+        else:
+            messages.append({"role": msg.role, "content": msg.content})
 
-    raw_content = completion.choices[0].message.content
+    print(f"DEBUG: Sending messages to LLM: {json.dumps(messages, ensure_ascii=False)}")
+
+    max_retries = 3
+    last_error = None
+    raw_content = ""
+
+    for attempt in range(max_retries):
+        try:
+            print(f"DEBUG: Attempt {attempt + 1}/{max_retries}")
+            # 設定 timeout=30秒，避免卡死
+            # 設定 max_tokens=1024，避免模型生成過長
+            completion = await client.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                temperature=0.7,
+                timeout=30.0,
+                max_tokens=1024,
+                presence_penalty=0.6,
+            )
+            
+            raw_content = completion.choices[0].message.content
+            
+            # 檢查是否為垃圾輸出 (連續驚嘆號)
+            if "!!!!!!!!!!" in raw_content:
+                print(f"WARNING: Detected garbage output (attempt {attempt+1}): {raw_content[:50]}...")
+                continue # Retry
+                
+            # 如果成功且沒有垃圾，跳出迴圈
+            break
+            
+        except Exception as e:
+            print(f"ERROR: LLM call failed (attempt {attempt+1}): {e}")
+            last_error = e
+            if attempt == max_retries - 1:
+                # 回傳錯誤給前端，而不是讓它掛著
+                return ChatResponse(
+                    reply="抱歉，AI 暫時無法回應 (Timeout or Error)。",
+                    model=model_name,
+                    thinking=str(e)
+                )
+
+    if not raw_content:
+         return ChatResponse(
+            reply="抱歉，AI 產生了無效的回應。",
+            model=model_name,
+            thinking="Empty response or garbage filtered out."
+        )
+
+    print(f"DEBUG: Raw LLM response: {raw_content}")
 
     def extract_structured(text: str) -> tuple[str, Optional[str]]:
         """Best-effort抽取 reply/thinking，避免模型偷跑一般文字."""
