@@ -367,6 +367,11 @@ body {
 }
 
 /* Chat Mode Layout Changes */
+.page.chat-mode {
+  height: 100vh;
+  overflow: hidden;
+}
+
 .page.chat-mode .hero,
 .page.chat-mode .chip-row {
   display: none !important;
@@ -374,82 +379,24 @@ body {
 
 .page.chat-mode .shell {
   justify-content: flex-start;
-  padding-bottom: 20px;
+  padding-bottom: 0;
+  height: 100%;
+  overflow: hidden; /* Constrain the shell */
 }
 
 .page.chat-mode .chat-panel {
   order: 1;
   flex: 1;
   width: 100%;
-  min-height: 0;
+  min-height: 0; /* Important for flex scrolling */
   display: flex;
   flex-direction: column;
   background: transparent;
   border: none;
   box-shadow: none;
   padding: 0;
-  margin-bottom: 20px;
-}
-
-.page.chat-mode .chat-panel.empty {
-  display: flex; /* Override display: none when in chat mode if needed, though logic removes .empty class usually */
-}
-
-.page.chat-mode .messages {
-  flex: 1;
-  overflow-y: auto;
-  background: transparent;
-  max-height: none;
-  min-height: 0;
-  padding: 0 4px;
-  /* Hide scrollbar for cleaner look */
-  scrollbar-width: none;
-}
-
-.page.chat-mode .messages::-webkit-scrollbar {
-  display: none;
-}
-
-.page.chat-mode .composer-container {
-  order: 2;
-  width: 100%;
-  max-width: 800px;
-  flex-shrink: 0;
-  position: sticky;
-  bottom: 20px;
-  background-color: var(--bg-color); /* Ensure background covers content behind it */
-  padding-top: 10px;
-  z-index: 10;
-}
-
-/* Adjust message bubbles in chat mode */
-.page.chat-mode .message {
-  max-width: 85%;
-}
-
-/* Chat Mode Layout Changes */
-.page.chat-mode .hero,
-.page.chat-mode .chip-row {
-  display: none !important;
-}
-
-.page.chat-mode .shell {
-  justify-content: flex-start;
-  padding-bottom: 20px;
-}
-
-.page.chat-mode .chat-panel {
-  order: 1;
-  flex: 1;
-  width: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  padding: 0;
-  margin-bottom: 20px;
+  margin-bottom: 0;
+  overflow: hidden;
 }
 
 .page.chat-mode .chat-panel.empty {
@@ -460,14 +407,20 @@ body {
   flex: 1;
   overflow-y: auto;
   background: transparent;
-  max-height: none;
-  min-height: 0;
-  padding: 0 4px;
-  scrollbar-width: none;
+  padding: 20px 4px;
+  /* Restore scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: #444746 transparent;
 }
 
 .page.chat-mode .messages::-webkit-scrollbar {
-  display: none;
+  display: block;
+  width: 6px;
+}
+
+.page.chat-mode .messages::-webkit-scrollbar-thumb {
+  background-color: #444746;
+  border-radius: 3px;
 }
 
 .page.chat-mode .composer-container {
@@ -475,10 +428,9 @@ body {
   width: 100%;
   max-width: 800px;
   flex-shrink: 0;
-  position: sticky;
-  bottom: 20px;
+  position: relative; /* No longer sticky needed if flex layout handles it */
   background-color: var(--bg-color);
-  padding-top: 10px;
+  padding: 10px 0 20px 0;
   z-index: 10;
 }
 

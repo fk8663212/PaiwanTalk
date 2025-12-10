@@ -1,3 +1,7 @@
+import json
+import re
+from typing import Optional
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -30,6 +34,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
     model: str
+    thinking: Optional[str] = None
 
 
 @app.get("/")
@@ -68,11 +73,68 @@ async def chat(req: ChatRequest):
     completion = client.chat.completions.create(
         model=model_name,
         messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
+            {
+                "role": "system",
+                "content": (
+                    "You are a helpful assistant. Always respond with strict JSON "
+                    "using keys `reply` (final answer shown to the user) and "
+                    "`thinking` (brief reasoning). Do not include other text."
+                ),
+            },
             {"role": "user", "content": req.message},
         ],
         temperature=0.7,
     )
 
-    reply = completion.choices[0].message.content
-    return ChatResponse(reply=reply, model=model_name)
+    raw_content = completion.choices[0].message.content
+
+    def extract_structured(text: str) -> tuple[str, Optional[str]]:
+        """Best-effort抽取 reply/thinking，避免模型偷跑一般文字."""
+        clean_content = text.strip()
+
+        # 去除 ```json ... ``` 或 ``` ... ``` 包裹
+        if clean_content.startswith("```") and clean_content.endswith("```"):
+            inner_lines = clean_content.split("\n")
+            clean_content = "\n".join(inner_lines[1:-1]).strip()
+
+        # 1) 直接嘗試 JSON
+        def try_parse_json(candidate: str):
+            parsed = json.loads(candidate)
+            if isinstance(parsed, dict):
+                return (
+                    str(parsed.get("reply") or "").strip(),
+                    str(parsed.get("thinking") or "").strip(),
+                )
+            return None
+
+        try:
+            result = try_parse_json(clean_content)
+            if result:
+                return result[0] or text, result[1] or None
+        except Exception:
+            pass
+
+        # 2) 嘗試抓最後一段 {...} 再 parse
+        if "{" in clean_content and "}" in clean_content:
+            last_open = clean_content.rfind("{")
+            last_close = clean_content.rfind("}")
+            if last_close > last_open:
+                maybe_json = clean_content[last_open : last_close + 1]
+                try:
+                    result = try_parse_json(maybe_json)
+                    if result:
+                        return result[0] or text, result[1] or None
+                except Exception:
+                    pass
+
+        # 3) regex 撈出 reply/thinking 欄位
+        reply_match = re.search(r'"reply"\\s*:\\s*"([^"]+)"', clean_content)
+        thinking_match = re.search(r'"thinking"\\s*:\\s*"([^"]+)"', clean_content)
+        if reply_match:
+            return reply_match.group(1), thinking_match.group(1) if thinking_match else None
+
+        # 都失敗就原文
+        return text, None
+
+    reply_text, thinking_text = extract_structured(raw_content)
+    return ChatResponse(reply=reply_text, model=model_name, thinking=thinking_text)
