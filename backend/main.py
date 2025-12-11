@@ -66,6 +66,19 @@ class ChatResponse(BaseModel):
     thinking: Optional[str] = None
     intent: Optional[str] = None # Added intent to response for debugging/UI
 
+
+class SimpleTranslateRequest(BaseModel):
+    text: str
+    # 目前僅實作排灣語 -> 中文，如需雙向可再擴充
+    direction: Optional[str] = "paiwan2zh"
+    # 與 ChatRequest 相同："default" | "vllm_only" | "openai_only"
+    model_mode: Optional[str] = "default"
+
+
+class SimpleTranslateResponse(BaseModel):
+    translation: str
+    thinking: Optional[str] = None
+
 @app.get("/")
 def root():
     return {"status": "ok", "msg": "PaiwanTalk AI Router Running"}
@@ -80,6 +93,47 @@ async def get_default_model_name(active_client: DualClient) -> str:
     if not getattr(models, "data", None):
         raise RuntimeError("No models available from vLLM server.")
     return models.data[0].id
+
+
+@app.post("/api/translate_simple", response_model=SimpleTranslateResponse)
+async def translate_simple(req: SimpleTranslateRequest):
+    """簡易翻譯 API，給瀏覽器擴充程式或其他客戶端使用。
+
+    目前只支援排灣語 -> 中文方向（paiwan2zh）。
+    """
+
+    direction = (req.direction or "paiwan2zh").lower()
+    if direction != "paiwan2zh":
+        return SimpleTranslateResponse(
+            translation="目前僅支援排灣語翻譯成中文 (paiwan2zh)。",
+            thinking="Unsupported direction",
+        )
+
+    # 根據 model_mode 選擇實際要用的 client / 模型
+    mode = (req.model_mode or "default").lower()
+
+    if mode == "openai_only":
+        active_client = client_openai_only
+        model_name = "gpt-4o-mini"
+    else:
+        # default 或 vllm_only 都需要跟 vLLM 查可用模型
+        active_client = client_default if mode == "default" else client_vllm_only
+        try:
+            model_name = await get_default_model_name(active_client)
+        except Exception as e:
+            return SimpleTranslateResponse(
+                translation="無法取得模型列表，請稍後再試。",
+                thinking=str(e),
+            )
+
+    messages_list = [{"role": "user", "content": req.text}]
+
+    result = await translator.process(active_client, model_name, messages_list)
+
+    return SimpleTranslateResponse(
+        translation=result.get("reply", ""),
+        thinking=result.get("thinking", ""),
+    )
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(req: ChatRequest):

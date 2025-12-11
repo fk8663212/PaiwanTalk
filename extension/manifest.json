@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "PaiwanTalk 翻譯擴充套件",
+  "version": "0.1.0",
+  "description": "使用 PaiwanTalk 後端 API，將排灣語翻譯成繁體中文。",
+  "permissions": [
+    "contextMenus",
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "http://localhost:8000/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "PaiwanTalk 翻譯"
+  }
+}

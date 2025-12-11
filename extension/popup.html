@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <title>PaiwanTalk 翻譯</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        margin: 10px;
+        width: 320px;
+      }
+      textarea {
+        width: 100%;
+        height: 80px;
+        box-sizing: border-box;
+        margin-bottom: 8px;
+      }
+      button {
+        padding: 6px 12px;
+        cursor: pointer;
+      }
+      .result {
+        margin-top: 8px;
+        white-space: pre-wrap;
+        border-top: 1px solid #ddd;
+        padding-top: 6px;
+        font-size: 0.9rem;
+      }
+      .thinking {
+        margin-top: 4px;
+        color: #666;
+        font-size: 0.8rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h3>PaiwanTalk 翻譯</h3>
+    <textarea id="input" placeholder="輸入要翻譯的排灣語句子..."></textarea>
+    <div style="margin-bottom: 6px; margin-top: 2px;">
+      <label for="modelMode">使用模型：</label>
+      <select id="modelMode">
+        <option value="default">預設（主辦 + 我的 API）</option>
+        <option value="vllm_only">只用主辦模型</option>
+        <option value="openai_only">只用我的 API</option>
+      </select>
+    </div>
+    <div>
+      <button id="translateBtn">翻譯成中文</button>
+    </div>
+    <div class="result" id="result"></div>
+    <div class="thinking" id="thinking"></div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
