@@ -123,7 +123,7 @@ async def chat(req: ChatRequest):
                 model=model_name,
                 messages=messages,
                 temperature=0.7,
-                timeout=30.0,
+                timeout=20.0,
                 max_tokens=1024,
                 presence_penalty=0.6,
             )

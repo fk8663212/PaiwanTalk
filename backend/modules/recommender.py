@@ -68,7 +68,7 @@ async def process(client: Any, model_name: str, messages: List[Dict[str, str]]) 
                 model=model_name,
                 messages=full_messages,
                 temperature=0.7,
-                timeout=30.0,
+                timeout=20.0,
                 max_tokens=1024,
             )
             

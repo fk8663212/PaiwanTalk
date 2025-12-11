@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 from ddgs import DDGS
 from openai import AsyncOpenAI
 from typing import List, Dict, Any
+from .utils import extract_structured
 
 
 # 設定爬取內容長度限制 (避免超過 Context Window)
@@ -138,6 +139,10 @@ async def get_web_summary(client: AsyncOpenAI, model_name: str, messages: List[D
 
     回傳：{"summary": str, "sources": List[{"title": str, "url": str}]}
     """
+    # 強制加上 "台灣" 關鍵字以確保結果相關性
+    if "台灣" not in query and "Taiwan" not in query:
+        query += " 台灣"
+
     print(f"🔍 [搜尋] 正在 DuckDuckGo 查詢: {query} ...")
     
     # --- 1. 執行搜尋 (使用 to_thread 避免卡住) ---
@@ -211,16 +216,21 @@ async def get_web_summary(client: AsyncOpenAI, model_name: str, messages: List[D
     """
 
     # 使用 await 非同步呼叫 OpenAI
+    # 設定 timeout=15.0 秒，若 vLLM 卡住則會拋出錯誤，讓 DualClient 捕獲並切換到下一個 client
     response = await client.chat.completions.create(
         model=model_name,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
+        timeout=10.0
     )
 
-    summary = response.choices[0].message.content
-    return {"summary": summary, "sources": used_sources}
+    raw_content = response.choices[0].message.content
+    # 嘗試使用 extract_structured 清理可能被包裝的 JSON 或雜訊
+    cleaned_reply, _ = extract_structured(raw_content)
+    
+    return {"summary": cleaned_reply, "sources": used_sources}
 
 
 async def process(client: AsyncOpenAI, model_name: str, messages: List[Dict[str, str]]) -> Dict[str, Any]:
