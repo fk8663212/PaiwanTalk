@@ -9,6 +9,8 @@ async def classify_intent(client: AsyncOpenAI, model_name: str, messages: List[D
     - 'translation': User wants to translate text to Paiwan.
     - 'recommendation': User wants example sentences or learning materials.
     - 'chat': Normal conversation or unclear intent.
+    - 'search': User asks for up-to-date factual information that likely requires web search
+                (e.g. current events, today's weather, latest statistics, rankings, etc.).
     """
     
     system_prompt = (
@@ -27,7 +29,10 @@ async def classify_intent(client: AsyncOpenAI, model_name: str, messages: List[D
         "   - Greetings like '你好', '早安'.\n"
         "   - Questions about the bot.\n"
         "   - If the user inputs Chinese text (even if they ask to translate it to Paiwan, we classify as chat because we only support Paiwan->Chinese translation).\n\n"
-        "Return a JSON object with a single key 'intent'. Value must be one of: 'translation', 'recommendation', 'chat'.\n"
+        "4. 'search': \n"
+        "   - The user asks about current news, today's weather, recent statistics, rankings, prices, or any information that clearly depends on up-to-date web data.\n"
+        "   - Example: '今天台北的天氣如何？', '今年金馬獎最佳影片是誰？', '目前美元對台幣匯率多少？','介紹一下五年祭'.\n\n"
+        "Return a JSON object with a single key 'intent'. Value must be one of: 'translation', 'recommendation', 'chat', 'search'.\n"
         "Example: {\"intent\": \"translation\"}"
     )
 
@@ -61,6 +66,8 @@ async def classify_intent(client: AsyncOpenAI, model_name: str, messages: List[D
             return result.get("intent", "chat")
         except json.JSONDecodeError:
             # Fallback: check for keywords in the raw content
+            if "search" in content:
+                return "search"
             if "translation" in content:
                 return "translation"
             elif "recommendation" in content:

@@ -12,6 +12,7 @@ load_dotenv()
 
 # Import our new modules
 from modules import classifier, chat, translator, recommender
+from modules import search_test
 from modules.dual_client import DualClient
 
 # ========= vLLM 設定 =========
@@ -116,6 +117,9 @@ async def chat_endpoint(req: ChatRequest):
         response_data = await translator.process(active_client, model_name, messages_list)
     elif intent == "recommendation":
         response_data = await recommender.process(active_client, model_name, messages_list)
+    elif intent == "search":
+        # 新增：若判定為需要網路搜尋的問題，交給 search_test 模組處理
+        response_data = await search_test.process(active_client, model_name, messages_list)
     else:
         # Default to chat
         response_data = await chat.process(active_client, model_name, messages_list)
