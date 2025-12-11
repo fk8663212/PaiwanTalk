@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual envs
+.venv/
+venv/
+
+# Environment files
+.env
+
+# Node / frontend artifacts
+node_modules/
+
+# OS / editor
+.DS_Store
+.vscode/
