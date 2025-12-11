@@ -14,8 +14,8 @@
     *   **例句推薦 (Recommendation)**：
         *   基於 Excel 資料庫 (`formosan_pairs_paiwan.xlsx`) 隨機推薦排灣語例句，幫助使用者學習。
     *   **即時搜尋 (Search)**：
-        *   整合 **DuckDuckGo** 搜尋引擎，針對時事、天氣或特定知識（如「五年祭」）進行網路檢索。
-        *   **在地化優化**：強制針對台灣地區進行搜尋，並由 LLM 整理成繁體中文摘要。
+        *   整合 **DuckDuckGo** 搜尋頁面，模擬使用者在瀏覽器中查詢，擷取前 3 筆結果的網頁內容後再交由 LLM 濃縮。
+        *   **在地化優化**：搜尋請求鎖定台灣繁體中文結果，並由 LLM 整理成繁體中文摘要，同時在「思考過程」中列出實際使用的來源網站清單。
     *   **一般對話 (Chat)**：
         *   具備短期記憶的日常對話功能。
 
@@ -47,6 +47,13 @@ PaiwanTalk/
 │   ├── index.html
 │   ├── script.js
 │   └── style.css
+├── extension/                  # Chrome / Edge 擴充功能範本 (Manifest V3)
+│   ├── manifest.json
+│   ├── background.js           # 右鍵選單 -> 交由 popup / content script 處理
+│   ├── popup.html              # 工具列小視窗 (可輸入文字翻譯 + 選模型)
+│   ├── popup.js
+│   ├── content.js             # 在網頁上選取文字後顯示「PT」小浮窗並就地翻譯
+│   └── README.txt
 └── requirements.txt            # Python 依賴
 ```
 
@@ -101,13 +108,59 @@ python3 -m http.server 8080
 
 打開瀏覽器訪問 `http://localhost:8080` 即可使用。
 
+## 瀏覽器擴充功能：PaiwanTalk 翻譯擴充套件
+
+本專案提供一個可直接載入於 Chrome / Edge 的 Manifest V3 擴充功能範本，方便在任意網頁上選取排灣語文字並立即翻譯。
+
+### 1. 功能說明
+
+- **工具列 Popup 翻譯**：
+    - 點擊瀏覽器工具列的「PaiwanTalk 翻譯」圖示，會開啟一個小視窗。
+    - 輸入排灣語句子後按下「翻譯成中文」，會透過後端 `/api/translate_simple` 取得翻譯結果與思考說明。
+    - 可在下拉選單中選擇使用的模型模式：
+        - 預設（主辦 vLLM + 你的 OpenAI API 混合）
+        - 只用主辦模型 (`vllm_only`)
+        - 只用自己的 OpenAI API (`openai_only`)
+    - 所選模型會記錄在瀏覽器的 `chrome.storage` 中，之後會沿用同一設定，直到你再次更改。
+
+- **選取文字後的小浮窗 (PT 氣泡)**：
+    - 在任意網頁選取排灣語文字後，游標附近會出現一個小方塊按鈕「PT」。
+    - 點擊「PT」後，小方塊會顯示「翻譯中...」，並呼叫同一個翻譯 API。
+    - 完成後，小方塊會直接顯示翻譯結果，方便就地閱讀，不需要切換頁面。
+    - 小方塊會跟隨你最後在 Popup 中選擇的模型模式。
+
+### 2. 安裝與測試（開發階段）
+
+1. 確保後端已啟動：
+
+     ```bash
+     cd backend
+     ~/paiwantalk-venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+     ```
+
+2. 在 Chrome / Edge 載入未封裝擴充功能：
+     - 打開「擴充功能 / 擴充套件」管理頁。
+     - 開啟「開發人員模式」。
+     - 點「載入未封裝項目」（Load unpacked）。
+     - 選擇專案中的 `extension/` 資料夾。
+
+3. 測試方式：
+     - **工具列 Popup**：
+         - 點擴充圖示 → 在文字框輸入排灣語 → 按「翻譯成中文」。
+     - **頁面選取翻譯**：
+         - 在任意網頁上選取一段排灣語文字。
+         - 點選出現的「PT」小方塊 → 觀察翻譯結果與反應速度。
+
+> 若你修改了擴充程式程式碼（如 content.js / popup.js），請記得在擴充管理頁點「重新載入」，並重新整理要測試的網頁，確保新的內容腳本已被注入。
+
 ## 技術細節
 
 *   **Backend Framework**: FastAPI
 *   **LLM Integration**: AsyncOpenAI SDK (Compatible with vLLM & OpenAI)
-*   **Search**: DuckDuckGo Search (ddgs)
+*   **Search**: DuckDuckGo HTML Search + BeautifulSoup + LLM 摘要
 *   **Data Processing**: Pandas, OpenPyXL (Excel handling), FuzzyWuzzy (String matching)
 *   **Frontend**: Vanilla JavaScript, HTML5, CSS3
+*   **Browser Extension**: Chrome / Edge Manifest V3, Background Service Worker + Content Scripts + Action Popup
 
 ---
 Developed for AMD AI Agent Online Hackathon.
