@@ -6,8 +6,12 @@ const messagesEl = document.getElementById("messages");
 const inputEl = document.getElementById("user-input");
 const sendBtn = document.getElementById("send-btn");
 const chips = document.querySelectorAll(".chip");
+const modelSelectorEl = document.getElementById("model-selector");
+const modelLabelEl = modelSelectorEl?.querySelector(".model-label");
+const modelOptionEls = document.querySelectorAll(".model-option");
 
 let conversationHistory = [];
+let modelMode = "default"; // "default" | "vllm_only" | "openai_only"
 
 function closeThinkingModal() {
   const existing = document.querySelector(".thinking-modal-overlay");
@@ -105,7 +109,10 @@ async function sendMessage() {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ messages: conversationHistory }),
+      body: JSON.stringify({
+        messages: conversationHistory,
+        model_mode: modelMode,
+      }),
     });
 
     if (!resp.ok) {
@@ -149,3 +156,29 @@ chips.forEach((chip) => {
     sendMessage();
   });
 });
+
+// 模型選擇下拉選單的互動
+if (modelSelectorEl) {
+  modelSelectorEl.addEventListener("click", (e) => {
+    e.stopPropagation();
+    modelSelectorEl.classList.toggle("open");
+  });
+
+  modelOptionEls.forEach((opt) => {
+    opt.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const mode = opt.dataset.mode || "default";
+      modelMode = mode;
+      if (modelLabelEl) {
+        modelLabelEl.textContent = opt.textContent;
+      }
+      modelSelectorEl.classList.remove("open");
+    });
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!modelSelectorEl.contains(e.target)) {
+      modelSelectorEl.classList.remove("open");
+    }
+  });
+}

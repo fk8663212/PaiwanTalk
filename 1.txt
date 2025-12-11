@@ -1,0 +1,8 @@
+# 1. 啟動自己的虛擬環境（非 root）
+source ~/paiwantalk-venv/bin/activate
+
+# 2. 進入專案 backend 目錄
+cd /home/paiwan/PaiwanTalk/backend
+
+# 3. 啟動 uvicorn
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
