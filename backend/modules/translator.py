@@ -1,7 +1,10 @@
 import json
 import re
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+
+import pandas as pd
+
 from .utils import extract_structured
 from paiwan_translation_api_multi import MultiSourceTranslator, SOURCE_FILES, SourceEnum
 
@@ -9,6 +12,82 @@ from paiwan_translation_api_multi import MultiSourceTranslator, SOURCE_FILES, So
 # Assuming data directory is in the parent directory relative to this module or current working dir
 # We need to be careful about paths. Since we run from backend/, data/ should be accessible.
 translator_instance = None
+
+# ====== Excel 精確對照表：formosan_pairs_paiwan.xlsx ======
+_excel_pairs_cache: Optional[Dict[str, str]] = None
+
+def _normalize_paiwan_phrase(text: str) -> str:
+    """將排灣語片段標準化，用來做精確比對。
+
+    - 去除前後空白
+    - 移除結尾標點（？?！!。.,）
+    - 合併多個空白
+    - 統一為小寫
+    """
+    if not text:
+        return ""
+    t = text.strip()
+    t = re.sub(r"[？?！!。\.,]+$", "", t)
+    t = re.sub(r"\s+", " ", t)
+    return t.lower()
+
+
+def _load_excel_pairs() -> Dict[str, str]:
+    """載入 backend/data/formosan_pairs_paiwan.xlsx，建立『排灣語片段 → 中文』對照表。
+
+    只取 lang_norm 為 'Paiwan' 的列，欄位 Ab 為排灣語、Ch 為中文。
+    """
+    global _excel_pairs_cache
+    if _excel_pairs_cache is not None:
+        return _excel_pairs_cache
+
+    try:
+        base_dir = os.path.dirname(os.path.dirname(__file__))  # backend/
+        excel_path = os.path.join(base_dir, "data", "formosan_pairs_paiwan.xlsx")
+
+        if not os.path.exists(excel_path):
+            print(f"[TranslatorModule] Excel file not found: {excel_path}")
+            _excel_pairs_cache = {}
+            return _excel_pairs_cache
+
+        df = pd.read_excel(excel_path)
+
+        # 僅保留排灣語資料
+        if "lang_norm" in df.columns:
+            df = df[df["lang_norm"].astype(str).str.lower() == "paiwan"]
+
+        mapping: Dict[str, str] = {}
+        for _, row in df.iterrows():
+            ab = str(row.get("Ab", "")).strip()
+            ch = str(row.get("Ch", "")).strip()
+            if not ab or not ch:
+                continue
+            key = _normalize_paiwan_phrase(ab)
+            if not key:
+                continue
+            # 若有重複 key，保留第一筆即可
+            mapping.setdefault(key, ch)
+
+        _excel_pairs_cache = mapping
+        print(f"[TranslatorModule] Loaded {len(mapping)} exact Paiwan pairs from Excel.")
+        return _excel_pairs_cache
+
+    except Exception as e:
+        print(f"[TranslatorModule] Failed to load Excel pairs: {e}")
+        _excel_pairs_cache = {}
+        return _excel_pairs_cache
+
+
+def lookup_exact_from_excel(paiwan_text: str) -> Optional[str]:
+    """先從 formosan_pairs_paiwan.xlsx 以整句精確查詢。
+
+    命中則直接回傳中文，後續不再走 RAG + LLM，以確保準確性。
+    """
+    mapping = _load_excel_pairs()
+    key = _normalize_paiwan_phrase(paiwan_text)
+    if not key:
+        return None
+    return mapping.get(key)
 
 def get_translator():
     global translator_instance
@@ -109,6 +188,18 @@ async def process(client: Any, model_name: str, messages: List[Dict[str, str]]) 
         except Exception as e:
             print(f"[Translator] Extraction failed: {e}")
             paiwan_text = user_input
+
+    # 1.6 先查 Excel 精確對照表，若有命中就直接回傳
+    exact_ch = lookup_exact_from_excel(paiwan_text)
+    if exact_ch:
+        thinking = (
+            "已從 formosan_pairs_paiwan.xlsx 命中精確對照，"
+            f"排灣語：{paiwan_text} → 中文：{exact_ch}"
+        )
+        return {
+            "reply": exact_ch,
+            "thinking": thinking,
+        }
 
     # 2. Tokenize and Lookup Dictionary
     tokens = split_tokens(paiwan_text)
