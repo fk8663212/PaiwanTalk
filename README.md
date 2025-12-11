@@ -162,5 +162,91 @@ python3 -m http.server 8080
 *   **Frontend**: Vanilla JavaScript, HTML5, CSS3
 *   **Browser Extension**: Chrome / Edge Manifest V3, Background Service Worker + Content Scripts + Action Popup
 
+## 系統架構圖
+
+以下為 PaiwanTalk 目前的整體流程架構（可在支援 Mermaid 的 Markdown 檢視器中直接渲染）：
+
+```mermaid
+flowchart LR
+    %% 使用者入口
+    subgraph Client["使用者端"]
+        FE["Web 前端 (frontend/index.html + script.js)"]
+        EXT_POP["瀏覽器擴充 Popup\n(extension/popup.html + popup.js)"]
+        EXT_CONTENT["頁面選取小浮窗 PT\n(extension/content.js)"]
+    end
+
+    %% 後端 FastAPI
+    subgraph BE["FastAPI 後端 (backend/main.py)"]
+        CHAT_API["POST /chat\n(意圖路由入口)"]
+        TRANS_API["POST /api/translate_simple\n(簡易翻譯 API)"]
+
+        subgraph ROUTER["Router & DualClient 選模型"]
+            CLASS["classifier.process\n意圖分類"]
+            DUAL["DualClient\n(vLLM 列表 + OpenAI fallback)"]
+        end
+
+        subgraph MODS["功能模組 (backend/modules)"]
+            TR["translator.py\n排灣語翻譯 (RAG + Excel)"]
+            REC["recommender.py\n例句推薦"]
+            SRCH["search_test.py\nDuckDuckGo + LLM 摘要"]
+            CH["chat.py\n一般對話"]
+        end
+    end
+
+    %% 外部 LLM / 搜尋資源
+    subgraph LLM["LLM / 模型端"]
+        VLLM1["vLLM Host 1"]
+        VLLM2["vLLM Host 2"]
+        OPENAI["OpenAI API\n(gpt-4o-mini)"]
+    end
+
+    subgraph DATA["本地資料 / 字典"]
+        EXCEL["formosan_pairs_paiwan.xlsx\n精確對照表"]
+        JSONS["千字表 / 教材詞彙 /\n華語筆畫字典 JSON"]
+    end
+
+    subgraph WEB["外部網頁搜尋"]
+        DDG["DuckDuckGo 搜尋頁\n(HTML 結果)"]
+        SITES["前 3 筆實際網站\n(BeautifulSoup 爬文)"]
+    end
+
+    %% 前端與後端互動
+    FE -->|"POST /chat\n{ messages, model_mode }"| CHAT_API
+    EXT_POP -->|"POST /api/translate_simple\n{ text, direction, model_mode }"| TRANS_API
+    EXT_CONTENT -->|"POST /api/translate_simple\n(選取文字 + model_mode)"| TRANS_API
+
+    %% /chat 路由流程
+    CHAT_API --> CLASS
+    CLASS -->|"intent = translation"| TR
+    CLASS -->|"intent = recommendation"| REC
+    CLASS -->|"intent = search"| SRCH
+    CLASS -->|"intent = chat / 其他"| CH
+
+    %% 簡易翻譯 API 直接走翻譯模組
+    TRANS_API --> TR
+
+    %% translator 模組
+    TR -->|"整句先查"| EXCEL
+    TR -->|"未命中時\n切詞查字典"| JSONS
+    TR -->|"組 prompt\n呼叫 LLM"| DUAL
+
+    %% recommender 模組
+    REC --> EXCEL
+
+    %% search_test 模組
+    SRCH -->|"組搜尋關鍵字"| DDG
+    DDG -->|"解析 HTML 結果"| SITES
+    SITES -->|"整理純文字\n組合成 context"| SRCH
+    SRCH -->|"LLM 摘要"| DUAL
+
+    %% chat / 其他模組直接呼叫 LLM
+    CH --> DUAL
+
+    %% DualClient 呼叫順序
+    DUAL -->|"優先 vLLM"| VLLM1
+    DUAL -->|"失敗再 vLLM2"| VLLM2
+    DUAL -->|"vLLM 全失敗或輸出異常\nfallback OpenAI"| OPENAI
+```
+
 ---
 Developed for AMD AI Agent Online Hackathon.
