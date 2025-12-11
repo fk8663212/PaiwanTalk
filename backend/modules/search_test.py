@@ -3,7 +3,7 @@ import re
 import asyncio
 import requests
 from bs4 import BeautifulSoup
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 from openai import AsyncOpenAI
 from typing import List, Dict, Any
 

@@ -11,3 +11,4 @@ python-dotenv
 openpyxl
 beautifulsoup4
 duckduckgo-search
+ddgs
