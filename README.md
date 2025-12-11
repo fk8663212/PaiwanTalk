@@ -13,25 +13,25 @@ flowchart LR
     %% 使用者入口
     subgraph Client["使用者端"]
         FE["Web 前端 (frontend/index.html + script.js)"]
-        EXT_POP["瀏覽器擴充 Popup\n(extension/popup.html + popup.js)"]
-        EXT_CONTENT["頁面選取小浮窗 PT\n(extension/content.js)"]
+        EXT_POP["瀏覽器擴充 Popup<br/>(extension/popup.html + popup.js)"]
+        EXT_CONTENT["頁面選取小浮窗 PT<br/>(extension/content.js)"]
     end
 
     %% 後端 FastAPI
     subgraph BE["FastAPI 後端 (backend/main.py)"]
-        CHAT_API["POST /chat\n(意圖路由入口)"]
-        TRANS_API["POST /api/translate_simple\n(簡易翻譯 API)"]
+        CHAT_API["POST /chat<br/>(意圖路由入口)"]
+        TRANS_API["POST /api/translate_simple<br/>(簡易翻譯 API)"]
 
         subgraph ROUTER["Router & DualClient 選模型"]
-            CLASS["classifier.process\n意圖分類"]
-            DUAL["DualClient\n(vLLM 列表 + OpenAI fallback)"]
+            CLASS["classifier.process<br/>意圖分類"]
+            DUAL["DualClient<br/>(vLLM 列表 + OpenAI fallback)"]
         end
 
         subgraph MODS["功能模組 (backend/modules)"]
-            TR["translator.py\n排灣語翻譯 (RAG + Excel)"]
-            REC["recommender.py\n例句推薦"]
-            SRCH["search_test.py\nDuckDuckGo + LLM 摘要"]
-            CH["chat.py\n一般對話"]
+            TR["translator.py<br/>排灣語翻譯 (RAG + Excel)"]
+            REC["recommender.py<br/>例句推薦"]
+            SRCH["search_test.py<br/>DuckDuckGo + LLM 摘要"]
+            CH["chat.py<br/>一般對話"]
         end
     end
 
@@ -39,23 +39,23 @@ flowchart LR
     subgraph LLM["LLM / 模型端"]
         VLLM1["vLLM Host 1"]
         VLLM2["vLLM Host 2"]
-        OPENAI["OpenAI API\n(gpt-4o-mini)"]
+        OPENAI["OpenAI API<br/>(gpt-4o-mini)"]
     end
 
     subgraph DATA["本地資料 / 字典"]
-        EXCEL["formosan_pairs_paiwan.xlsx\n精確對照表"]
-        JSONS["千字表 / 教材詞彙 /\n華語筆畫字典 JSON"]
+        EXCEL["formosan_pairs_paiwan.xlsx<br/>精確對照表"]
+        JSONS["千字表 / 教材詞彙 /<br/>華語筆畫字典 JSON"]
     end
 
     subgraph WEB["外部網頁搜尋"]
-        DDG["DuckDuckGo 搜尋頁\n(HTML 結果)"]
-        SITES["前 3 筆實際網站\n(BeautifulSoup 爬文)"]
+        DDG["DuckDuckGo 搜尋頁<br/>(HTML 結果)"]
+        SITES["前 3 筆實際網站<br/>(BeautifulSoup 爬文)"]
     end
 
     %% 前端與後端互動
-    FE -->|"POST /chat\n{ messages, model_mode }"| CHAT_API
-    EXT_POP -->|"POST /api/translate_simple\n{ text, direction, model_mode }"| TRANS_API
-    EXT_CONTENT -->|"POST /api/translate_simple\n(選取文字 + model_mode)"| TRANS_API
+    FE -->|"POST /chat<br/>{ messages, model_mode }"| CHAT_API
+    EXT_POP -->|"POST /api/translate_simple<br/>{ text, direction, model_mode }"| TRANS_API
+    EXT_CONTENT -->|"POST /api/translate_simple<br/>(選取文字 + model_mode)"| TRANS_API
 
     %% /chat 路由流程
     CHAT_API --> CLASS
@@ -69,8 +69,8 @@ flowchart LR
 
     %% translator 模組
     TR -->|"整句先查"| EXCEL
-    TR -->|"未命中時\n切詞查字典"| JSONS
-    TR -->|"組 prompt\n呼叫 LLM"| DUAL
+    TR -->|"未命中時<br/>切詞查字典"| JSONS
+    TR -->|"組 prompt<br/>呼叫 LLM"| DUAL
 
     %% recommender 模組
     REC --> EXCEL
@@ -78,7 +78,7 @@ flowchart LR
     %% search_test 模組
     SRCH -->|"組搜尋關鍵字"| DDG
     DDG -->|"解析 HTML 結果"| SITES
-    SITES -->|"整理純文字\n組合成 context"| SRCH
+    SITES -->|"整理純文字<br/>組合成 context"| SRCH
     SRCH -->|"LLM 摘要"| DUAL
 
     %% chat / 其他模組直接呼叫 LLM
@@ -87,7 +87,7 @@ flowchart LR
     %% DualClient 呼叫順序
     DUAL -->|"優先 vLLM"| VLLM1
     DUAL -->|"失敗再 vLLM2"| VLLM2
-    DUAL -->|"vLLM 全失敗或輸出異常\nfallback OpenAI"| OPENAI
+    DUAL -->|"vLLM 全失敗或輸出異常<br/>fallback OpenAI"| OPENAI
 ```
 
 ## 功能特色
