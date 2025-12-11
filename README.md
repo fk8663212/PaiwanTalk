@@ -1,8 +1,8 @@
 # PaiwanTalk - 排灣語 AI 學習助手
 
 這是一個結合大型語言模型 (LLM) 與檢索增強生成 (RAG) 技術的排灣語學習助手。旨在提供準確的排灣語翻譯、對話練習、例句推薦以及即時資訊查詢功能。
-*** Dome 網址: https://gorily-nonantagonistic-martina.ngrok-free.dev/frontend/
-*** Dome 影片: https://youtu.be/hHcnbltX_U8
+- Dome 網址: https://gorily-nonantagonistic-martina.ngrok-free.dev/frontend/
+- Dome 影片: https://youtu.be/hHcnbltX_U8
 
 ## 系統架構圖
 
